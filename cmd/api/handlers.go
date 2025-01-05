@@ -1,9 +1,12 @@
 package main
 
 import (
+	"ApiBook/internal/data"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 func (app *application) healthcheck(w http.ResponseWriter, r *http.Request) {
@@ -11,15 +14,50 @@ func (app *application) healthcheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
-	fmt.Println(w, "status: available")
-	fmt.Fprintf(w, "environment:  %s\n", app.config.evn)
-	fmt.Fprintf(w, "version:  %s\n", version)
+	data := map[string]string{
+		"status":      "available",
+		"environment": app.config.evn,
+		"version":     version,
+	}
+	js, err := json.Marshal(data)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	js = append(js, '\n')
+	w.Header().Set("Content-Type", "application.json")
+	w.Write(js)
 }
 
 func (app *application) getCreateBooksHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodGet {
-		fmt.Fprintln(w, "Display a list of book")
+		books := []data.Book{
+			{
+				ID:        1,
+				CreateAt:  time.Now(),
+				Title:     "Echoes",
+				Published: 2008,
+				Page:      300,
+				Genres:    []string{"Action", "Fiction"},
+				Rating:    8.5,
+				Version:   5,
+			},
+			{
+				ID:        2,
+				CreateAt:  time.Now(),
+				Title:     "Alis",
+				Published: 1940,
+				Page:      250,
+				Genres:    []string{"Action", "Fiction"},
+				Rating:    7.5,
+				Version:   3,
+			},
+		}
+		if err := app.writeJson(w, http.StatusOK, books); err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	if r.Method == http.MethodPost {
@@ -47,7 +85,22 @@ func (app *application) getBook(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Bade request", http.StatusBadRequest)
 	}
-	fmt.Fprintf(w, "Display book of id: %d", idInt)
+
+	book := data.Book{
+		ID:        idInt,
+		CreateAt:  time.Now(),
+		Title:     "Echoes",
+		Published: 2008,
+		Page:      300,
+		Genres:    []string{"Action", "Fiction"},
+		Rating:    8.5,
+		Version:   5,
+	}
+	if err := app.writeJson(w, http.StatusOK, book); err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
 }
 
 func (app *application) updateBook(w http.ResponseWriter, r *http.Request) {
