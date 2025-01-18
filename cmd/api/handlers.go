@@ -54,14 +54,27 @@ func (app *application) getCreateBooksHandler(w http.ResponseWriter, r *http.Req
 				Version:   3,
 			},
 		}
-		if err := app.writeJson(w, http.StatusOK, books); err != nil {
+		if err := app.writeJson(w, http.StatusOK, envelope{"books": books}); err != nil {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 	}
 
 	if r.Method == http.MethodPost {
-		fmt.Fprintln(w, "Add a new book")
+		var input struct {
+			Title     string   `json:"title"`
+			Published int      `json:"published,omitempty"`
+			Page      int      `json:"page,omitempty"`
+			Genres    []string `json:"genres,omitempty"`
+			Rating    float32  `json:"rating,omitempty"`
+		}
+		err := app.readJSON(w, r, &input)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+
+		fmt.Fprintf(w, "%v\n", input)
 	}
 }
 
@@ -96,7 +109,7 @@ func (app *application) getBook(w http.ResponseWriter, r *http.Request) {
 		Rating:    8.5,
 		Version:   5,
 	}
-	if err := app.writeJson(w, http.StatusOK, book); err != nil {
+	if err := app.writeJson(w, http.StatusOK, envelope{"book": book}); err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -107,9 +120,59 @@ func (app *application) updateBook(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Path[len("/v1/books/"):]
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		http.Error(w, "Bade request", http.StatusBadRequest)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
 	}
-	fmt.Fprintf(w, "Update book of id: %d", idInt)
+
+	var input struct {
+		Title     *string  `json:"title"`
+		Published *int     `json:"published"`
+		Page      *int     `json:"page"`
+		Genres    []string `json:"genres"`
+		Rating    *float32 `json:"rating"`
+	}
+
+	book := data.Book{
+		ID:        idInt,
+		CreateAt:  time.Now(),
+		Title:     "Echoes in the Darkness",
+		Published: 2019,
+		Page:      300,
+		Genres:    []string{"Fiction", "Thriller"},
+		Rating:    4.5,
+		Version:   1,
+	}
+
+	err = app.readJSON(w, r, &input)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	if input.Title != nil {
+		book.Title = *input.Title
+	}
+
+	if input.Published != nil {
+		book.Published = *input.Published
+	}
+
+	if input.Page != nil {
+		book.Page = *input.Page
+	}
+
+	if len(input.Genres) > 0 {
+		book.Genres = input.Genres
+	}
+
+	if input.Rating != nil {
+		book.Rating = *input.Rating
+	}
+
+	if err := app.writeJson(w, http.StatusOK, envelope{"book": book}); err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (app *application) deleteBook(w http.ResponseWriter, r *http.Request) {
